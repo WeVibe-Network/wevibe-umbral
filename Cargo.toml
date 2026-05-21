@@ -16,7 +16,7 @@ path = "src/main.rs"
 
 [dependencies]
 umbral-pre = { version = "0.11.0", features = ["default-serialization", "serde"] }
-generic-array = "0.14"
+generic-array = "1.4"
 tonic = "0.14.5"
 prost = "0.14"
 tonic-prost = "0.14.5"
