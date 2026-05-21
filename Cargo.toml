@@ -1,0 +1,33 @@
+[package]
+name = "wevibe-umbral"
+version = "0.1.0"
+edition = "2021"
+repository = "https://github.com/WeVibe-Network/wevibe-umbral"
+homepage = "https://github.com/WeVibe-Network/wevibe-umbral"
+license = "GPL-3.0"
+
+[lib]
+name = "wevibe_umbral"
+path = "src/lib.rs"
+
+[[bin]]
+name = "wevibe-umbral"
+path = "src/main.rs"
+
+[dependencies]
+umbral-pre = { version = "0.11.0", features = ["default-serialization", "serde"] }
+generic-array = "0.14"
+tonic = "0.14.5"
+prost = "0.14"
+tonic-prost = "0.14.5"
+rmp-serde = "1.3"
+tokio = { version = "1", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+hex = "0.4"
+dashmap = "6.0"
+clap = { version = "4", features = ["derive"] }
+serde_json = "1"
+
+[build-dependencies]
+tonic-build = "0.14.5"
