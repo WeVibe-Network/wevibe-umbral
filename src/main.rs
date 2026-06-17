@@ -49,6 +49,23 @@ enum Commands {
         #[arg(long)]
         delegating_pk: String,
     },
+    /// Derive a deterministic Umbral epoch keypair from a 32-byte seed
+    #[command(name = "derive-epoch-keypair")]
+    DeriveEpochKeypair {
+        /// 32-byte seed (hex)
+        #[arg(long)]
+        seed: String,
+    },
+    /// Generate a single kfrag from delegating secret key and receiving public key
+    #[command(name = "generate-kfrags")]
+    GenerateKfrags {
+        /// Delegating secret key (hex, 32 bytes)
+        #[arg(long)]
+        delegating_sk: String,
+        /// Receiving public key (hex, 33 bytes compressed)
+        #[arg(long)]
+        receiving_pk: String,
+    },
 }
 
 async fn run_grpc_server(addr: SocketAddr) -> Result<(), Box<dyn std::error::Error>> {
@@ -106,6 +123,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 &receiving_sk,
                 &delegating_pk,
             ) {
+                eprintln!("{}", json!({ "error": e.to_string() }));
+                std::process::exit(1);
+            }
+        }
+        Some(Commands::DeriveEpochKeypair { seed }) => {
+            if let Err(e) = cli::cmd_derive_epoch_keypair(&seed) {
+                eprintln!("{}", json!({ "error": e.to_string() }));
+                std::process::exit(1);
+            }
+        }
+        Some(Commands::GenerateKfrags {
+            delegating_sk,
+            receiving_pk,
+        }) => {
+            if let Err(e) = cli::cmd_generate_kfrags(&delegating_sk, &receiving_pk) {
                 eprintln!("{}", json!({ "error": e.to_string() }));
                 std::process::exit(1);
             }
