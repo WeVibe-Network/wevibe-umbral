@@ -31,6 +31,15 @@ enum Commands {
         #[arg(long)]
         plaintext: String,
     },
+    /// Re-encrypt a capsule using a single kfrag
+    Reencrypt {
+        /// Original Umbral capsule (hex)
+        #[arg(long)]
+        capsule: String,
+        /// KFrag bytes (hex)
+        #[arg(long)]
+        kfrag: String,
+    },
     /// Decrypt a re-encrypted capsule
     DecryptReencrypted {
         /// Original Umbral capsule (hex)
@@ -42,7 +51,7 @@ enum Commands {
         /// Re-encrypted ciphertext - the Umbral-encrypted plaintext (hex)
         #[arg(long)]
         ciphertext: String,
-        /// Receiving (member) secret key (hex, 32 bytes)
+        /// Receiving (member) key seed (hex, 32 bytes)
         #[arg(long)]
         receiving_sk: String,
         /// Delegating (epoch) public key (hex, 33 bytes compressed)
@@ -56,10 +65,10 @@ enum Commands {
         #[arg(long)]
         seed: String,
     },
-    /// Generate a single kfrag from delegating secret key and receiving public key
+    /// Generate a single kfrag from delegating key seed and receiving public key
     #[command(name = "generate-kfrags")]
     GenerateKfrags {
-        /// Delegating secret key (hex, 32 bytes)
+        /// Delegating key seed (hex, 32 bytes)
         #[arg(long)]
         delegating_sk: String,
         /// Receiving public key (hex, 33 bytes compressed)
@@ -105,6 +114,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             plaintext,
         }) => {
             if let Err(e) = cli::cmd_encrypt(&epoch_pk, &plaintext) {
+                eprintln!("{}", json!({ "error": e.to_string() }));
+                std::process::exit(1);
+            }
+        }
+        Some(Commands::Reencrypt { capsule, kfrag }) => {
+            if let Err(e) = cli::cmd_reencrypt(&capsule, &kfrag) {
                 eprintln!("{}", json!({ "error": e.to_string() }));
                 std::process::exit(1);
             }

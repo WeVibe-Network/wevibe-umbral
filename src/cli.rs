@@ -2,7 +2,9 @@ use crate::crypto;
 use serde_json::json;
 use std::error::Error;
 use std::io;
-use umbral_pre::{decrypt_reencrypted, encrypt, generate_kfrags, SecretKeyFactory, Signer};
+use umbral_pre::{
+    decrypt_reencrypted, encrypt, generate_kfrags, reencrypt, SecretKeyFactory, Signer,
+};
 
 fn to_boxed_error(message: String) -> Box<dyn Error> {
     Box::new(io::Error::new(io::ErrorKind::InvalidInput, message))
@@ -60,7 +62,7 @@ pub fn derive_epoch_keypair_hex(seed_hex: &str) -> Result<DeriveEpochKeyPairResu
     let pk = sk.public_key();
 
     Ok(DeriveEpochKeyPairResult {
-        secret_key_hex: hex::encode(sk.to_be_bytes().as_secret()),
+        secret_key_hex: hex::encode(crypto::serialize_secret_key_seed(&seed_bytes)),
         public_key_hex: hex::encode(crypto::serialize_public_key(&pk)),
     })
 }
@@ -103,6 +105,25 @@ pub fn cmd_generate_kfrags(
 ) -> Result<(), Box<dyn Error>> {
     let kfrag_hex = generate_kfrag_hex(delegating_sk_hex, receiving_pk_hex).map_err(to_boxed_error)?;
     println!("{kfrag_hex}");
+    Ok(())
+}
+
+pub fn reencrypt_hex(capsule_hex: &str, kfrag_hex: &str) -> Result<String, String> {
+    let capsule_bytes = decode_hex("capsule", capsule_hex)?;
+    let kfrag_bytes = decode_hex("kfrag", kfrag_hex)?;
+
+    let capsule = crypto::deserialize_capsule(&capsule_bytes)?;
+    let kfrag = crypto::deserialize_key_frag(&kfrag_bytes)?;
+    let verified_kfrag = kfrag.skip_verification();
+
+    let vcfrag = reencrypt(&capsule, verified_kfrag);
+
+    Ok(hex::encode(crypto::serialize_verified_capsule_frag(&vcfrag)))
+}
+
+pub fn cmd_reencrypt(capsule_hex: &str, kfrag_hex: &str) -> Result<(), Box<dyn Error>> {
+    let cfrag_hex = reencrypt_hex(capsule_hex, kfrag_hex).map_err(to_boxed_error)?;
+    println!("{}", json!({ "cfrag": cfrag_hex }));
     Ok(())
 }
 
