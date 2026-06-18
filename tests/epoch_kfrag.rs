@@ -54,8 +54,8 @@ fn derive_epoch_keypair_hex_rejects_wrong_seed_lengths() {
             Err(err) => err,
         };
         assert!(
-            err.contains("Invalid seed length"),
-            "expected invalid seed length error, got: {err}"
+            err.contains("Invalid SecretKey length"),
+            "expected invalid secret key length error, got: {err}"
         );
     }
 }
@@ -72,6 +72,19 @@ fn derive_epoch_keypair_hex_outputs_valid_public_key_shape() {
 
     PublicKey::try_from_compressed_bytes(&public_key_bytes)
         .expect("public key bytes should decode as compressed Umbral key");
+}
+
+#[test]
+fn canonical_scalar_pubkey_matches_noble_parity_vector() {
+    let scalar_hex = "ef376809ddddcdf999ee1bbb68c52b09dc4e4c27223905934e0e4e8f1217bc3e";
+    let expected_pk_hex = "022dba416cf37ed93281aefd5a64c28984b36257018c9f47afec164e89a3805f38";
+
+    let scalar_bytes = hex::decode(scalar_hex).expect("scalar test vector should decode");
+    let sk = crypto::deserialize_secret_key(&scalar_bytes)
+        .expect("scalar test vector should deserialize as canonical secret key");
+
+    assert_eq!(hex::encode(crypto::serialize_secret_key(&sk)), scalar_hex);
+    assert_eq!(hex::encode(crypto::serialize_public_key(&sk.public_key())), expected_pk_hex);
 }
 
 #[test]

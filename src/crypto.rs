@@ -1,6 +1,6 @@
 use umbral_pre::{
     Capsule, CapsuleFrag, DefaultDeserialize, DefaultSerialize, KeyFrag, PublicKey, SecretKey,
-    SecretKeyFactory, VerifiedCapsuleFrag,
+    VerifiedCapsuleFrag,
 };
 
 pub fn serialize_public_key(pk: &PublicKey) -> Vec<u8> {
@@ -11,8 +11,8 @@ pub fn deserialize_public_key(bytes: &[u8]) -> Result<PublicKey, String> {
     PublicKey::try_from_compressed_bytes(bytes).map_err(|e| format!("Invalid PublicKey: {e}"))
 }
 
-pub fn serialize_secret_key_seed(seed: &[u8]) -> Vec<u8> {
-    seed.to_vec()
+pub fn serialize_secret_key(sk: &SecretKey) -> Vec<u8> {
+    sk.to_be_bytes().as_secret().to_vec()
 }
 
 pub fn serialize_key_frag(kf: &KeyFrag) -> Vec<u8> {
@@ -48,7 +48,14 @@ pub fn deserialize_capsule(bytes: &[u8]) -> Result<Capsule, String> {
 }
 
 pub fn deserialize_secret_key(bytes: &[u8]) -> Result<SecretKey, String> {
-    SecretKeyFactory::from_secure_randomness(bytes)
-        .map_err(|e| format!("Invalid SecretKey: {e}"))
-        .map(|factory| factory.make_key(b""))
+    if bytes.len() != 32 {
+        return Err(format!(
+            "Invalid SecretKey length: expected 32 bytes, got {}",
+            bytes.len()
+        ));
+    }
+
+    let mut scalar_bytes = SecretKey::random().to_be_bytes();
+    scalar_bytes.as_mut_secret().copy_from_slice(bytes);
+    SecretKey::try_from_be_bytes(&scalar_bytes).map_err(|e| format!("Invalid SecretKey: {e}"))
 }

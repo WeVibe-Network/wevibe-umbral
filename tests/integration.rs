@@ -1,9 +1,9 @@
-use wevibe_umbral::cli;
+use wevibe_umbral::{cli, crypto};
 use wevibe_umbral::store::KFragStore;
 use std::process::Command;
 use umbral_pre::{
     decrypt_reencrypted, encrypt, generate_kfrags, reencrypt, Capsule, CapsuleFrag, KeyFrag,
-    PublicKey, SecretKey, SecretKeyFactory, Signer, VerifiedCapsuleFrag,
+    PublicKey, SecretKey, Signer, VerifiedCapsuleFrag,
 };
 
 fn serialize_public_key(pk: &PublicKey) -> Vec<u8> {
@@ -12,6 +12,10 @@ fn serialize_public_key(pk: &PublicKey) -> Vec<u8> {
 
 fn deserialize_public_key(bytes: &[u8]) -> PublicKey {
     PublicKey::try_from_compressed_bytes(bytes).unwrap()
+}
+
+fn deserialize_secret_key(bytes: &[u8]) -> SecretKey {
+    crypto::deserialize_secret_key(bytes).unwrap()
 }
 
 fn serialize_key_frag(kf: &KeyFrag) -> Vec<u8> {
@@ -155,11 +159,9 @@ fn test_retrieve_nonexistent_kfrag() {
 }
 
 #[test]
-fn test_factory_workaround_can_sign_and_verify() {
+fn test_canonical_scalar_secret_key_can_sign_and_verify() {
     let seed = b"01234567890123456789012345678901";
-    let sk = SecretKeyFactory::from_secure_randomness(seed)
-        .unwrap()
-        .make_key(b"");
+    let sk = deserialize_secret_key(seed);
     let pk = sk.public_key();
     let pk_from_sk = sk.public_key();
 
@@ -173,11 +175,9 @@ fn test_factory_workaround_can_sign_and_verify() {
 }
 
 #[test]
-fn test_secretkey_factory_workaround_produces_valid_signing_key() {
+fn test_canonical_scalar_secret_key_produces_valid_signing_key() {
     let seed = b"test-seed-bytes-32-long-here!!!!";
-    let sk = SecretKeyFactory::from_secure_randomness(seed)
-        .unwrap()
-        .make_key(b"");
+    let sk = deserialize_secret_key(seed);
     let pk = sk.public_key();
 
     let signer = Signer::new(sk);
@@ -250,9 +250,7 @@ fn test_cli_unit_encrypt_decrypt_roundtrip() {
     let epoch_sk = SecretKey::random();
     let epoch_pk = epoch_sk.public_key();
     let member_seed = [11u8; 32];
-    let member_sk = SecretKeyFactory::from_secure_randomness(&member_seed)
-        .unwrap()
-        .make_key(b"");
+    let member_sk = deserialize_secret_key(&member_seed);
 
     let signer = Signer::new(epoch_sk.clone());
     let kfrags = generate_kfrags(
@@ -334,9 +332,7 @@ fn test_cli_subprocess_decrypt_reencrypted_produces_json() {
     let epoch_sk = SecretKey::random();
     let epoch_pk = epoch_sk.public_key();
     let member_seed = [29u8; 32];
-    let member_sk = SecretKeyFactory::from_secure_randomness(&member_seed)
-        .unwrap()
-        .make_key(b"");
+    let member_sk = deserialize_secret_key(&member_seed);
 
     let signer = Signer::new(epoch_sk.clone());
     let kfrags = generate_kfrags(
@@ -466,9 +462,7 @@ fn test_cli_subprocess_decrypt_wrong_key_errors() {
     let epoch_sk = SecretKey::random();
     let epoch_pk = epoch_sk.public_key();
     let member_seed = [71u8; 32];
-    let member_sk = SecretKeyFactory::from_secure_randomness(&member_seed)
-        .unwrap()
-        .make_key(b"");
+    let member_sk = deserialize_secret_key(&member_seed);
     let wrong_member_seed = [72u8; 32];
 
     let signer = Signer::new(epoch_sk.clone());

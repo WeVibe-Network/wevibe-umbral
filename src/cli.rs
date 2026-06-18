@@ -2,9 +2,7 @@ use crate::crypto;
 use serde_json::json;
 use std::error::Error;
 use std::io;
-use umbral_pre::{
-    decrypt_reencrypted, encrypt, generate_kfrags, reencrypt, SecretKeyFactory, Signer,
-};
+use umbral_pre::{decrypt_reencrypted, encrypt, generate_kfrags, reencrypt, Signer};
 
 fn to_boxed_error(message: String) -> Box<dyn Error> {
     Box::new(io::Error::new(io::ErrorKind::InvalidInput, message))
@@ -56,13 +54,11 @@ pub struct DeriveEpochKeyPairResult {
 pub fn derive_epoch_keypair_hex(seed_hex: &str) -> Result<DeriveEpochKeyPairResult, String> {
     let seed_bytes = decode_hex("seed", seed_hex)?;
 
-    let sk = SecretKeyFactory::from_secure_randomness(&seed_bytes)
-        .map_err(|e| format!("Invalid seed length: {e}"))?
-        .make_key(b"");
+    let sk = crypto::deserialize_secret_key(&seed_bytes)?;
     let pk = sk.public_key();
 
     Ok(DeriveEpochKeyPairResult {
-        secret_key_hex: hex::encode(crypto::serialize_secret_key_seed(&seed_bytes)),
+        secret_key_hex: hex::encode(crypto::serialize_secret_key(&sk)),
         public_key_hex: hex::encode(crypto::serialize_public_key(&pk)),
     })
 }
