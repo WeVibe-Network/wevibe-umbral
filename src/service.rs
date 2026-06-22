@@ -3,6 +3,7 @@ use crate::generated::umbral_sidecar_server::{UmbralSidecar};
 use crate::generated::*;
 use crate::store::KFragStore;
 use std::sync::Arc;
+use tracing::{info, warn};
 use tonic::{Request, Response, Status};
 use umbral_pre::reencrypt;
 
@@ -12,8 +13,18 @@ pub struct UmbralSidecarService {
 
 impl UmbralSidecarService {
     pub fn new() -> Self {
+        let store = Arc::new(KFragStore::new());
+        let startup_count = store.len();
+
+        info!("kfrag store entry count on startup: {}", startup_count);
+        if startup_count == 0 {
+            warn!(
+                "kfrag store empty on startup — recall will fail until provisioned (re-run provision-recall)"
+            );
+        }
+
         Self {
-            store: Arc::new(KFragStore::new()),
+            store,
         }
     }
 }
