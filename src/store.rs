@@ -74,19 +74,59 @@ impl KFragStore {
             (org_id.to_string(), epoch_id, member_pk.to_vec()),
             kfrag.to_vec(),
         );
-        if let Err(err) = self.persist_to_disk() {
-            error!(
-                "failed to persist kfrag store after insert to {}: {}",
-                self.path.display(),
-                err
-            );
+        match self.persist_to_disk() {
+            Ok(()) => {
+                info!(
+                    op = "insert",
+                    status = "ok",
+                    org = %org_id,
+                    epoch = epoch_id,
+                    member_pk_fp = %crate::crypto::fingerprint(member_pk),
+                    kfrag_len = kfrag.len(),
+                    count = self.store.len(),
+                    "kfrag insert ok"
+                );
+            }
+            Err(err) => {
+                error!(
+                    "failed to persist kfrag store after insert to {}: {}",
+                    self.path.display(),
+                    err
+                );
+            }
         }
     }
 
     pub fn get(&self, org_id: &str, epoch_id: u64, member_pk: &[u8]) -> Option<Vec<u8>> {
-        self.store
+        let result = self
+            .store
             .get(&(org_id.to_string(), epoch_id, member_pk.to_vec()))
-            .map(|v| v.value().clone())
+            .map(|v| v.value().clone());
+
+        match result.as_ref() {
+            Some(_) => {
+                info!(
+                    op = "get",
+                    status = "ok",
+                    org = %org_id,
+                    epoch = epoch_id,
+                    member_pk_fp = %crate::crypto::fingerprint(member_pk),
+                    "kfrag get hit"
+                );
+            }
+            None => {
+                warn!(
+                    op = "get",
+                    status = "not_found",
+                    org = %org_id,
+                    epoch = epoch_id,
+                    member_pk_fp = %crate::crypto::fingerprint(member_pk),
+                    "kfrag get MISS — no entry for org/epoch/member (stale-key symptom)"
+                );
+            }
+        }
+
+        result
     }
 
     pub fn delete(&self, org_id: &str, member_pk: &[u8]) -> u32 {
@@ -102,12 +142,24 @@ impl KFragStore {
             }
         });
 
-        if let Err(err) = self.persist_to_disk() {
-            error!(
-                "failed to persist kfrag store after delete to {}: {}",
-                self.path.display(),
-                err
-            );
+        match self.persist_to_disk() {
+            Ok(()) => {
+                info!(
+                    op = "delete",
+                    status = "ok",
+                    org = %org_id,
+                    member_pk_fp = %crate::crypto::fingerprint(member_pk),
+                    deleted_count = count,
+                    "kfrag delete ok"
+                );
+            }
+            Err(err) => {
+                error!(
+                    "failed to persist kfrag store after delete to {}: {}",
+                    self.path.display(),
+                    err
+                );
+            }
         }
         count
     }
@@ -124,12 +176,23 @@ impl KFragStore {
             }
         });
 
-        if let Err(err) = self.persist_to_disk() {
-            error!(
-                "failed to persist kfrag store after delete_org to {}: {}",
-                self.path.display(),
-                err
-            );
+        match self.persist_to_disk() {
+            Ok(()) => {
+                info!(
+                    op = "delete_org",
+                    status = "ok",
+                    org = %org_id,
+                    deleted_count = count,
+                    "kfrag delete_org ok"
+                );
+            }
+            Err(err) => {
+                error!(
+                    "failed to persist kfrag store after delete_org to {}: {}",
+                    self.path.display(),
+                    err
+                );
+            }
         }
         count
     }
@@ -152,6 +215,12 @@ impl KFragStore {
     }
 
     fn load_from_disk(&self) {
+        info!(
+            op = "load_from_disk",
+            path = %self.path.display(),
+            "loading kfrag store"
+        );
+
         if !self.path.exists() {
             info!(
                 "kfrag store file {} not found; starting with empty in-memory store",
@@ -308,6 +377,16 @@ impl KFragStore {
 
         if persist_result.is_err() {
             let _ = fs::remove_file(&temp_path);
+        }
+
+        if persist_result.is_ok() {
+            info!(
+                op = "persist_to_disk",
+                status = "ok",
+                path = %self.path.display(),
+                count = self.store.len(),
+                "kfrag store persisted"
+            );
         }
 
         persist_result

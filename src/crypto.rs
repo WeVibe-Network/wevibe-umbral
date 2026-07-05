@@ -59,3 +59,11 @@ pub fn deserialize_secret_key(bytes: &[u8]) -> Result<SecretKey, String> {
     scalar_bytes.as_mut_secret().copy_from_slice(bytes);
     SecretKey::try_from_be_bytes(&scalar_bytes).map_err(|e| format!("Invalid SecretKey: {e}"))
 }
+
+/// Fingerprint for logging: first 8 hex chars of sha256(bytes).
+/// NEVER log raw key/kfrag/capsule/plaintext bytes — this fingerprint + sizes only (D-MISSION-INVARIANT).
+pub fn fingerprint(bytes: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+    let digest = Sha256::digest(bytes);
+    hex::encode(&digest[..4])
+}

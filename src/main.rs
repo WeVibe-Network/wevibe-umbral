@@ -82,8 +82,14 @@ async fn run_grpc_server(addr: SocketAddr) -> Result<(), Box<dyn std::error::Err
         .with(tracing_subscriber::EnvFilter::new(
             std::env::var("RUST_LOG").unwrap_or_else(|_| "info".into()),
         ))
-        .with(tracing_subscriber::fmt::layer())
+        .with(
+            tracing_subscriber::fmt::layer()
+                .with_level(true)
+                .with_target(true),
+        )
         .init();
+
+    tracing::info!(op = "startup", "umbral sidecar tracing initialized (stdout, timestamp+level)");
 
     let service = UmbralSidecarService::new();
 
