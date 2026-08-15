@@ -14,7 +14,18 @@ path = "src/lib.rs"
 name = "wevibe-umbral"
 path = "src/main.rs"
 
+[workspace]
+members = ["crates/core"]
+# crates/wasm is its own workspace root on purpose: [profile.*] in a workspace
+# MEMBER is silently ignored, and the wasm build needs opt-level="z" + lto +
+# panic="abort" to hit its size target. Those settings must not leak onto the
+# native binary, so the wasm crate stays excluded.
+exclude = ["crates/wasm"]
+
 [dependencies]
+# All Umbral crypto lives in the core crate, shared byte-for-byte with the
+# WASM build that ships inside wevibe-mcp. Do not add umbral-pre calls here.
+wevibe-umbral-core = { path = "crates/core" }
 umbral-pre = { version = "0.11.0", features = ["default-serialization", "serde"] }
 generic-array = "1.4"
 tonic = "0.14.5"

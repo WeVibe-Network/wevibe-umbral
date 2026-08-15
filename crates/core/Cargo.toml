@@ -1,0 +1,27 @@
+[package]
+name = "wevibe-umbral-core"
+version = "0.1.0"
+edition = "2021"
+repository = "https://github.com/WeVibe-Network/wevibe-umbral"
+homepage = "https://github.com/WeVibe-Network/wevibe-umbral"
+license = "GPL-3.0"
+description = "Umbral PRE crypto core for WeVibe — the single implementation shared by the native binary and the WASM build."
+
+[lib]
+name = "wevibe_umbral_core"
+path = "src/lib.rs"
+
+# Deliberately dependency-light: everything here must compile for
+# wasm32-unknown-unknown. Do NOT add tokio, tonic, prost or dashmap.
+[dependencies]
+umbral-pre = { version = "0.11.0", features = ["default-serialization", "serde"] }
+hex = "0.4"
+sha2 = "0.10"
+
+# umbral-pre pulls getrandom 0.2 transitively via rand_core. On wasm32 that
+# target is not supported unless the "js" backend is enabled from the crate
+# graph — and it has to be declared where the dependency is reachable, not in
+# the leaf. Without this the build fails at link time; with it, encrypt(),
+# generate_kfrags() and SecretKey::random() all draw from the host CSPRNG.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.2", features = ["js"] }

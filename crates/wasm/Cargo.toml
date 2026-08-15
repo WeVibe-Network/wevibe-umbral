@@ -1,0 +1,36 @@
+[package]
+name = "wevibe-umbral-wasm"
+version = "0.1.0"
+edition = "2021"
+repository = "https://github.com/WeVibe-Network/wevibe-umbral"
+homepage = "https://github.com/WeVibe-Network/wevibe-umbral"
+license = "GPL-3.0"
+description = "WASM bindings for WeVibe's Umbral PRE core — shipped inside the wevibe-mcp npm package."
+
+# Standalone workspace root — see the `exclude` note in ../../Cargo.toml.
+[workspace]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wevibe-umbral-core = { path = "../core" }
+wasm-bindgen = "0.2"
+
+# wasm-pack ships a wasm-opt that predates bulk-memory. Without these flags the
+# Rust build succeeds and post-processing then fails with
+# "Bulk memory operations require bulk memory [--enable-bulk-memory]".
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = [
+  '-Oz',
+  '--enable-bulk-memory',
+  '--enable-nontrapping-float-to-int',
+  '--enable-sign-ext',
+]
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
