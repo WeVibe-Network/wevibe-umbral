@@ -21,3 +21,6 @@ AGENTS.md
 MANAGER.md
 WORKER.md
 SESSIONCONTINUANCE.md
+
+# wasm-pack build output; the artifact is vendored into wevibe-mcp instead
+crates/wasm/pkg/
