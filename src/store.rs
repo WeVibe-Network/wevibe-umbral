@@ -20,33 +20,31 @@ struct PersistedKFragStore {
 #[derive(Serialize, Deserialize)]
 struct PersistedKFragEntry {
     org_id: String,
-    epoch_id: u64,
     member_pk_hex: String,
     kfrag_hex: String,
 }
 
 impl PersistedKFragEntry {
-    fn from_runtime_entry(key: &(String, u64, Vec<u8>), value: &[u8]) -> Self {
+    fn from_runtime_entry(key: &(String, Vec<u8>), value: &[u8]) -> Self {
         Self {
             org_id: key.0.clone(),
-            epoch_id: key.1,
-            member_pk_hex: hex::encode(&key.2),
+            member_pk_hex: hex::encode(&key.1),
             kfrag_hex: hex::encode(value),
         }
     }
 
-    fn to_runtime_entry(&self) -> Result<((String, u64, Vec<u8>), Vec<u8>), String> {
+    fn to_runtime_entry(&self) -> Result<((String, Vec<u8>), Vec<u8>), String> {
         let member_pk = hex::decode(&self.member_pk_hex)
             .map_err(|err| format!("decode member_pk_hex: {err}"))?;
         let kfrag =
             hex::decode(&self.kfrag_hex).map_err(|err| format!("decode kfrag_hex: {err}"))?;
-        Ok(((self.org_id.clone(), self.epoch_id, member_pk), kfrag))
+        Ok(((self.org_id.clone(), member_pk), kfrag))
     }
 }
 
 #[derive(Clone)]
 pub struct KFragStore {
-    store: Arc<DashMap<(String, u64, Vec<u8>), Vec<u8>>>,
+    store: Arc<DashMap<(String, Vec<u8>), Vec<u8>>>,
     path: PathBuf,
     persist_lock: Arc<Mutex<()>>,
 }
@@ -68,19 +66,16 @@ impl KFragStore {
         instance
     }
 
-    pub fn insert(&self, org_id: &str, epoch_id: u64, member_pk: &[u8], kfrag: &[u8]) {
+    pub fn insert(&self, org_id: &str, member_pk: &[u8], kfrag: &[u8]) {
         let _persist_guard = self.persist_guard();
-        self.store.insert(
-            (org_id.to_string(), epoch_id, member_pk.to_vec()),
-            kfrag.to_vec(),
-        );
+        self.store
+            .insert((org_id.to_string(), member_pk.to_vec()), kfrag.to_vec());
         match self.persist_to_disk() {
             Ok(()) => {
                 info!(
                     op = "insert",
                     status = "ok",
                     org = %org_id,
-                    epoch = epoch_id,
                     member_pk_fp = %crate::crypto::fingerprint(member_pk),
                     kfrag_len = kfrag.len(),
                     count = self.store.len(),
@@ -97,10 +92,10 @@ impl KFragStore {
         }
     }
 
-    pub fn get(&self, org_id: &str, epoch_id: u64, member_pk: &[u8]) -> Option<Vec<u8>> {
+    pub fn get(&self, org_id: &str, member_pk: &[u8]) -> Option<Vec<u8>> {
         let result = self
             .store
-            .get(&(org_id.to_string(), epoch_id, member_pk.to_vec()))
+            .get(&(org_id.to_string(), member_pk.to_vec()))
             .map(|v| v.value().clone());
 
         match result.as_ref() {
@@ -109,7 +104,6 @@ impl KFragStore {
                     op = "get",
                     status = "ok",
                     org = %org_id,
-                    epoch = epoch_id,
                     member_pk_fp = %crate::crypto::fingerprint(member_pk),
                     "kfrag get hit"
                 );
@@ -119,9 +113,8 @@ impl KFragStore {
                     op = "get",
                     status = "not_found",
                     org = %org_id,
-                    epoch = epoch_id,
                     member_pk_fp = %crate::crypto::fingerprint(member_pk),
-                    "kfrag get MISS — no entry for org/epoch/member (stale-key symptom)"
+                    "kfrag get MISS — no entry for org/member (stale-key symptom)"
                 );
             }
         }
@@ -134,7 +127,7 @@ impl KFragStore {
         let mut count = 0;
         let key = member_pk.to_vec();
         self.store.retain(|k, _| {
-            if k.0 == org_id && k.2 == key {
+            if k.0 == org_id && k.1 == key {
                 count += 1;
                 false
             } else {
@@ -254,6 +247,10 @@ impl KFragStore {
         };
 
         let mut decoded_entries = Vec::with_capacity(persisted.entries.len());
+        // Single kfrag per (org, member): entries are inserted sequentially, so a
+        // legacy multi-epoch file whose entries collide on (org, member) resolves
+        // last-write-wins — the LAST-loaded entry for a member is the one served.
+        // (No compat shim: pre-MVP; the kfrag volume is wiped with the epoch removal.)
         for (index, entry) in persisted.entries.iter().enumerate() {
             match entry.to_runtime_entry() {
                 Ok(runtime_entry) => decoded_entries.push(runtime_entry),
@@ -290,7 +287,6 @@ impl KFragStore {
         entries.sort_by(|a, b| {
             a.org_id
                 .cmp(&b.org_id)
-                .then_with(|| a.epoch_id.cmp(&b.epoch_id))
                 .then_with(|| a.member_pk_hex.cmp(&b.member_pk_hex))
         });
 

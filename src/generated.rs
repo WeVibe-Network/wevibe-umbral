@@ -3,8 +3,6 @@
 pub struct StoreKFragRequest {
     #[prost(string, tag = "1")]
     pub org_id: ::prost::alloc::string::String,
-    #[prost(uint64, tag = "2")]
-    pub epoch_id: u64,
     #[prost(bytes = "vec", tag = "3")]
     pub member_pk: ::prost::alloc::vec::Vec<u8>,
     #[prost(bytes = "vec", tag = "4")]
@@ -17,8 +15,6 @@ pub struct ReEncryptRequest {
     /// Identifies which stored kfrag to use.
     #[prost(string, tag = "1")]
     pub org_id: ::prost::alloc::string::String,
-    #[prost(uint64, tag = "2")]
-    pub epoch_id: u64,
     #[prost(bytes = "vec", tag = "3")]
     pub member_pk: ::prost::alloc::vec::Vec<u8>,
     /// Serialized Umbral Capsule from the encrypted content.
@@ -162,7 +158,7 @@ pub mod umbral_sidecar_client {
             self.inner = self.inner.max_encoding_message_size(limit);
             self
         }
-        /// StoreKFrag stores a pre-generated kfrag for (org_id, epoch_id, member_pubkey).
+        /// StoreKFrag stores a pre-generated kfrag for (org_id, member_pubkey).
         /// Used when kfrags are generated on the leader machine.
         pub async fn store_k_frag(
             &mut self,
@@ -190,7 +186,7 @@ pub mod umbral_sidecar_client {
         }
         /// ReEncrypt applies a stored kfrag to a capsule, producing a cfrag.
         /// Called by the hub during memory retrieval.
-        /// Returns an error if no kfrag exists for the specified (org_id, epoch_id, member_pubkey).
+        /// Returns an error if no kfrag exists for the specified (org_id, member_pubkey).
         pub async fn re_encrypt(
             &mut self,
             request: impl tonic::IntoRequest<super::ReEncryptRequest>,
@@ -215,7 +211,7 @@ pub mod umbral_sidecar_client {
                 .insert(GrpcMethod::new("umbral.v1.UmbralSidecar", "ReEncrypt"));
             self.inner.unary(req, path, codec).await
         }
-        /// DeleteKFrags deletes all stored kfrags for a member across all epochs in an org.
+        /// DeleteKFrags deletes all stored kfrags for a member in an org.
         /// Called by the hub when a member is removed (triggered by MemberRemoved chain event).
         /// Idempotent — returns success even if no kfrags exist.
         pub async fn delete_k_frags(
@@ -305,7 +301,7 @@ pub mod umbral_sidecar_server {
     /// Generated trait containing gRPC methods that should be implemented for use with UmbralSidecarServer.
     #[async_trait]
     pub trait UmbralSidecar: std::marker::Send + std::marker::Sync + 'static {
-        /// StoreKFrag stores a pre-generated kfrag for (org_id, epoch_id, member_pubkey).
+        /// StoreKFrag stores a pre-generated kfrag for (org_id, member_pubkey).
         /// Used when kfrags are generated on the leader machine.
         async fn store_k_frag(
             &self,
@@ -316,7 +312,7 @@ pub mod umbral_sidecar_server {
         >;
         /// ReEncrypt applies a stored kfrag to a capsule, producing a cfrag.
         /// Called by the hub during memory retrieval.
-        /// Returns an error if no kfrag exists for the specified (org_id, epoch_id, member_pubkey).
+        /// Returns an error if no kfrag exists for the specified (org_id, member_pubkey).
         async fn re_encrypt(
             &self,
             request: tonic::Request<super::ReEncryptRequest>,
@@ -324,7 +320,7 @@ pub mod umbral_sidecar_server {
             tonic::Response<super::ReEncryptResponse>,
             tonic::Status,
         >;
-        /// DeleteKFrags deletes all stored kfrags for a member across all epochs in an org.
+        /// DeleteKFrags deletes all stored kfrags for a member in an org.
         /// Called by the hub when a member is removed (triggered by MemberRemoved chain event).
         /// Idempotent — returns success even if no kfrags exist.
         async fn delete_k_frags(

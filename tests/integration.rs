@@ -2,45 +2,24 @@ use wevibe_umbral::{cli, crypto};
 use wevibe_umbral::store::KFragStore;
 use std::process::Command;
 use umbral_pre::{
-    decrypt_reencrypted, encrypt, generate_kfrags, reencrypt, Capsule, CapsuleFrag, KeyFrag,
-    PublicKey, SecretKey, Signer, VerifiedCapsuleFrag,
+    decrypt_reencrypted, encrypt, generate_kfrags, reencrypt, Capsule, PublicKey, SecretKey,
+    Signer,
 };
-
-fn serialize_public_key(pk: &PublicKey) -> Vec<u8> {
-    pk.to_compressed_bytes().to_vec()
-}
-
-fn deserialize_public_key(bytes: &[u8]) -> PublicKey {
-    PublicKey::try_from_compressed_bytes(bytes).unwrap()
-}
 
 fn deserialize_secret_key(bytes: &[u8]) -> SecretKey {
     crypto::deserialize_secret_key(bytes).unwrap()
-}
-
-fn serialize_key_frag(kf: &KeyFrag) -> Vec<u8> {
-    rmp_serde::to_vec(kf).unwrap()
-}
-
-fn deserialize_key_frag(bytes: &[u8]) -> KeyFrag {
-    rmp_serde::from_slice(bytes).unwrap()
-}
-
-fn serialize_verified_capsule_frag(vcf: &VerifiedCapsuleFrag) -> Vec<u8> {
-    rmp_serde::to_vec(vcf).unwrap()
 }
 
 #[test]
 fn test_store_and_retrieve_kfrag() {
     let store = KFragStore::new();
     let org_id = "org-1";
-    let epoch_id = 42;
     let member_pk = b"member-pk-bytes".to_vec();
     let kfrag_bytes = b"kfrag-test-data".to_vec();
 
-    store.insert(org_id, epoch_id, &member_pk, &kfrag_bytes);
+    store.insert(org_id, &member_pk, &kfrag_bytes);
 
-    let retrieved = store.get(org_id, epoch_id, &member_pk);
+    let retrieved = store.get(org_id, &member_pk);
     assert!(retrieved.is_some(), "Expected kfrag to be retrieved");
     assert_eq!(retrieved.unwrap(), kfrag_bytes);
 }
@@ -49,7 +28,6 @@ fn test_store_and_retrieve_kfrag() {
 fn test_store_multiple_members_same_org() {
     let store = KFragStore::new();
     let org_id = "org-1";
-    let epoch_id = 1;
 
     let member1_pk = b"member-1-pk".to_vec();
     let member2_pk = b"member-2-pk".to_vec();
@@ -59,13 +37,13 @@ fn test_store_multiple_members_same_org() {
     let kfrag2 = b"kfrag-for-member-2".to_vec();
     let kfrag3 = b"kfrag-for-member-3".to_vec();
 
-    store.insert(org_id, epoch_id, &member1_pk, &kfrag1);
-    store.insert(org_id, epoch_id, &member2_pk, &kfrag2);
-    store.insert(org_id, epoch_id, &member3_pk, &kfrag3);
+    store.insert(org_id, &member1_pk, &kfrag1);
+    store.insert(org_id, &member2_pk, &kfrag2);
+    store.insert(org_id, &member3_pk, &kfrag3);
 
-    let retrieved1 = store.get(org_id, epoch_id, &member1_pk).unwrap();
-    let retrieved2 = store.get(org_id, epoch_id, &member2_pk).unwrap();
-    let retrieved3 = store.get(org_id, epoch_id, &member3_pk).unwrap();
+    let retrieved1 = store.get(org_id, &member1_pk).unwrap();
+    let retrieved2 = store.get(org_id, &member2_pk).unwrap();
+    let retrieved3 = store.get(org_id, &member3_pk).unwrap();
 
     assert_eq!(retrieved1, kfrag1);
     assert_eq!(retrieved2, kfrag2);
@@ -78,26 +56,20 @@ fn test_delete_kfrags_by_member() {
     let org_id = "org-1";
     let member_pk = b"target-member-pk".to_vec();
 
-    let kfrag1 = b"kfrag-epoch-1".to_vec();
-    let kfrag2 = b"kfrag-epoch-2".to_vec();
-    let kfrag3 = b"kfrag-epoch-3".to_vec();
+    let kfrag = b"kfrag-for-target-member".to_vec();
 
-    store.insert(org_id, 1, &member_pk, &kfrag1);
-    store.insert(org_id, 2, &member_pk, &kfrag2);
-    store.insert(org_id, 3, &member_pk, &kfrag3);
+    store.insert(org_id, &member_pk, &kfrag);
 
     let other_member_pk = b"other-member-pk".to_vec();
     let other_kfrag = b"other-member-kfrag".to_vec();
-    store.insert(org_id, 1, &other_member_pk, &other_kfrag);
+    store.insert(org_id, &other_member_pk, &other_kfrag);
 
     let deleted_count = store.delete(org_id, &member_pk);
-    assert_eq!(deleted_count, 3, "Expected 3 kfrags deleted for target member");
+    assert_eq!(deleted_count, 1, "Expected 1 kfrag deleted for target member");
 
-    assert!(store.get(org_id, 1, &member_pk).is_none());
-    assert!(store.get(org_id, 2, &member_pk).is_none());
-    assert!(store.get(org_id, 3, &member_pk).is_none());
+    assert!(store.get(org_id, &member_pk).is_none());
 
-    let other_retrieved = store.get(org_id, 1, &other_member_pk).unwrap();
+    let other_retrieved = store.get(org_id, &other_member_pk).unwrap();
     assert_eq!(other_retrieved, other_kfrag);
 }
 
@@ -110,40 +82,37 @@ fn test_delete_org_kfrags() {
     let member1_pk = b"member-1-pk".to_vec();
     let member2_pk = b"member-2-pk".to_vec();
 
-    store.insert(org_a, 1, &member1_pk, b"org-a-member1-epoch1".as_slice());
-    store.insert(org_a, 2, &member1_pk, b"org-a-member1-epoch2".as_slice());
-    store.insert(org_a, 1, &member2_pk, b"org-a-member2-epoch1".as_slice());
-    store.insert(org_b, 1, &member1_pk, b"org-b-member1-epoch1".as_slice());
+    store.insert(org_a, &member1_pk, b"org-a-member1".as_slice());
+    store.insert(org_a, &member2_pk, b"org-a-member2".as_slice());
+    store.insert(org_b, &member1_pk, b"org-b-member1".as_slice());
 
     let deleted_count = store.delete_org(org_a);
-    assert_eq!(deleted_count, 3, "Expected 3 kfrags deleted for org-a");
+    assert_eq!(deleted_count, 2, "Expected 2 kfrags deleted for org-a");
 
-    assert!(store.get(org_a, 1, &member1_pk).is_none());
-    assert!(store.get(org_a, 2, &member1_pk).is_none());
-    assert!(store.get(org_a, 1, &member2_pk).is_none());
+    assert!(store.get(org_a, &member1_pk).is_none());
+    assert!(store.get(org_a, &member2_pk).is_none());
 
-    let org_b_retrieved = store.get(org_b, 1, &member1_pk).unwrap();
-    assert_eq!(org_b_retrieved, b"org-b-member1-epoch1".to_vec());
+    let org_b_retrieved = store.get(org_b, &member1_pk).unwrap();
+    assert_eq!(org_b_retrieved, b"org-b-member1".to_vec());
 }
 
 #[test]
 fn test_overwrite_existing_kfrag() {
     let store = KFragStore::new();
     let org_id = "org-1";
-    let epoch_id = 1;
     let member_pk = b"member-pk".to_vec();
 
     let kfrag_v1 = b"kfrag-version-1".to_vec();
     let kfrag_v2 = b"kfrag-version-2".to_vec();
 
-    store.insert(org_id, epoch_id, &member_pk, &kfrag_v1);
+    store.insert(org_id, &member_pk, &kfrag_v1);
 
-    let first = store.get(org_id, epoch_id, &member_pk).unwrap();
+    let first = store.get(org_id, &member_pk).unwrap();
     assert_eq!(first, kfrag_v1);
 
-    store.insert(org_id, epoch_id, &member_pk, &kfrag_v2);
+    store.insert(org_id, &member_pk, &kfrag_v2);
 
-    let second = store.get(org_id, epoch_id, &member_pk).unwrap();
+    let second = store.get(org_id, &member_pk).unwrap();
     assert_eq!(second, kfrag_v2);
 }
 
@@ -151,10 +120,9 @@ fn test_overwrite_existing_kfrag() {
 fn test_retrieve_nonexistent_kfrag() {
     let store = KFragStore::new();
     let org_id = "nonexistent-org";
-    let epoch_id = 999;
     let member_pk = b"nonexistent-member".to_vec();
 
-    let result = store.get(org_id, epoch_id, &member_pk);
+    let result = store.get(org_id, &member_pk);
     assert!(result.is_none(), "Expected None for nonexistent kfrag");
 }
 
@@ -234,15 +202,6 @@ fn serialize_public_key_hex(pk: &PublicKey) -> String {
 
 fn deserialize_capsule(bytes: &[u8]) -> Capsule {
     rmp_serde::from_slice(bytes).unwrap()
-}
-
-fn serialize_secret_key_hex(sk: &SecretKey) -> String {
-    hex::encode(sk.to_be_bytes().as_secret())
-}
-
-fn deserialize_verified_capsule_frag(bytes: &[u8]) -> VerifiedCapsuleFrag {
-    let cfrag: CapsuleFrag = rmp_serde::from_slice(bytes).unwrap();
-    cfrag.skip_verification()
 }
 
 #[test]

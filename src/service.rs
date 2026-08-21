@@ -48,26 +48,24 @@ impl UmbralSidecar for UmbralSidecarService {
         info!(
             op = "re_encrypt",
             org = %req.org_id,
-            epoch = req.epoch_id,
             member_pk_fp = %member_pk_fp,
             capsule_fp = %capsule_fp,
             "re_encrypt entry"
         );
 
-        let kfrag_bytes = match self.store.get(&req.org_id, req.epoch_id, &req.member_pk) {
+        let kfrag_bytes = match self.store.get(&req.org_id, &req.member_pk) {
             Some(kfrag_bytes) => kfrag_bytes,
             None => {
                 warn!(
                     op = "re_encrypt",
                     org = %req.org_id,
-                    epoch = req.epoch_id,
                     member_pk_fp = %member_pk_fp,
                     status = "err",
                     reason = "kfrag_not_found",
                     "re_encrypt missing kfrag"
                 );
                 return Err(Status::not_found(
-                    "No kfrag found for specified org/epoch/member",
+                    "No kfrag found for specified org/member",
                 ));
             }
         };
@@ -76,7 +74,6 @@ impl UmbralSidecar for UmbralSidecarService {
             error!(
                 op = "re_encrypt",
                 org = %req.org_id,
-                epoch = req.epoch_id,
                 member_pk_fp = %member_pk_fp,
                 status = "err",
                 err = %e,
@@ -90,7 +87,6 @@ impl UmbralSidecar for UmbralSidecarService {
             error!(
                 op = "re_encrypt",
                 org = %req.org_id,
-                epoch = req.epoch_id,
                 member_pk_fp = %member_pk_fp,
                 capsule_fp = %capsule_fp,
                 status = "err",
@@ -106,7 +102,6 @@ impl UmbralSidecar for UmbralSidecarService {
         info!(
             op = "re_encrypt",
             org = %req.org_id,
-            epoch = req.epoch_id,
             status = "ok",
             cfrag_fp = %crypto::fingerprint(&cfrag_bytes),
             cfrag_len = cfrag_bytes.len(),
@@ -127,19 +122,16 @@ impl UmbralSidecar for UmbralSidecarService {
         info!(
             op = "store_k_frag",
             org = %req.org_id,
-            epoch = req.epoch_id,
             member_pk_fp = %crypto::fingerprint(&req.member_pk),
             kfrag_len = req.kfrag.len(),
             "store_k_frag entry"
         );
 
-        self.store
-            .insert(&req.org_id, req.epoch_id, &req.member_pk, &req.kfrag);
+        self.store.insert(&req.org_id, &req.member_pk, &req.kfrag);
 
         info!(
             op = "store_k_frag",
             org = %req.org_id,
-            epoch = req.epoch_id,
             status = "ok",
             "store_k_frag ok"
         );
